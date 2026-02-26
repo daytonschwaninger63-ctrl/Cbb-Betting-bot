@@ -18,7 +18,7 @@ def run_streamlit_ui():
 
     try:
         api_key = st.secrets["THE_ODDS_API_KEY"]
-        with st.spinner("Calculating Real-Time Value..."):
+        with st.spinner("Crunching 2026 Power Rankings..."):
             projections, odds = get_data(api_key) 
         
         if odds:
@@ -35,26 +35,32 @@ def run_streamlit_ui():
                 mkt_price = outcomes[0].get('price', 0)
                 mkt_prob = (abs(mkt_price)/(abs(mkt_price)+100)) if mkt_price < 0 else (100/(mkt_price+100))
                 
-                # FIND BOTH TEAMS IN BARTTORVIK DATA
-                home_rank = next((float(p[4]) for p in projections if home_name.lower() in str(p[1]).lower() or str(p[1]).lower() in home_name.lower()), 0.5)
-                away_rank = next((float(p[4]) for p in projections if away_name.lower() in str(p[1]).lower() or str(p[1]).lower() in away_name.lower()), 0.5)
+                # NEW 2026 INDEX LOGIC
+                # Index 1 = Team Name | Index 8 = Barthag Rating
+                home_rank = 0.5
+                away_rank = 0.5
                 
-                # THE FORMULA: Log5 win probability (Home vs Away)
-                # This is the actual math used by Vegas and BartTorvik
+                for p in projections:
+                    bt_name = str(p[1]).lower()
+                    if home_name.lower() in bt_name or bt_name in home_name.lower():
+                        home_rank = float(p[8])
+                    if away_name.lower() in bt_name or bt_name in away_name.lower():
+                        away_rank = float(p[8])
+
+                # Log5 Formula
                 win_prob = (home_rank - home_rank * away_rank) / (home_rank + away_rank - 2 * home_rank * away_rank)
-                
                 edge = (win_prob - mkt_prob) * 100
 
                 rows.append({
                     "Matchup": f"{away_name} @ {home_name}",
-                    "Market Odds": mkt_price,
+                    "Odds": mkt_price,
                     "Bot Win %": f"{win_prob:.1%}",
                     "Edge %": f"{edge:.1f}%"
                 })
 
             df = pd.DataFrame(rows)
             st.dataframe(df, use_container_width=True)
-            st.success("Analysis Live!")
+            st.success("2026 Data Loaded!")
     except Exception as e:
         st.error(f"Error: {e}")
 
