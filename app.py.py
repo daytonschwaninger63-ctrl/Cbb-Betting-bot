@@ -2,7 +2,23 @@ import streamlit as st
 import pandas as pd
 import requests
 import sys
-
+TEAM_MAP = {
+    "California Golden Bears": "California",
+    "Saint Mary's Gaels": "St. Mary's",
+    "Oregon St Beavers": "Oregon St.",
+    "Loyola Marymount Lions": "Loyola Marymount",
+    "Wisconsin Badgers": "Wisconsin",
+    "San Diego St Aztecs": "San Diego St.",
+    "St. Bonaventure Bonnies": "St. Bonaventure",
+    "Ole Miss Rebels": "Mississippi",
+    "UConn Huskies": "Connecticut",
+    "NC State Wolfpack": "N.C. State",
+    "Miami (FL) Hurricanes": "Miami FL",
+    "Texas A&M Aggies": "Texas A&M",
+    "Saint Joseph's Hawks": "St. Joseph's",
+    "Florida Intl Golden Panthers": "FIU",
+    "UL Monroe Warhawks": "ULM"
+}
 def get_data(api_key):
     # Fetch BartTorvik projections (Simplified for this example)
     proj_url = "https://barttorvik.com/2026_data.json" # Adjust year as needed
