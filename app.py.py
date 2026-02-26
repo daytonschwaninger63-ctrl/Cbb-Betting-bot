@@ -18,12 +18,11 @@ def run_streamlit_ui():
 
     try:
         api_key = st.secrets["THE_ODDS_API_KEY"]
-        with st.spinner("Bot is scouting teams..."):
+        with st.spinner("Locking 2026 Data..."):
             projections, odds = get_data(api_key) 
         
-        # Guard against API error strings (the 'str' error fix)
         if not isinstance(odds, list):
-            st.error("API Error: Check your key or quota in Streamlit Secrets.")
+            st.error("API Error: Check your key in Secrets.")
             return
 
         rows = []
@@ -38,21 +37,16 @@ def run_streamlit_ui():
             mkt_price = outcomes[0].get('price', 0)
             mkt_prob = (abs(mkt_price)/(abs(mkt_price)+100)) if mkt_price < 0 else (100/(mkt_price+100))
             
-            # --- THE SUPER MATCHER ---
+            # --- THE 2026 FIX ---
             h_rank, a_rank = 0.5, 0.5
-            # Clean names (remove "Tigers", "Bulldogs", etc. to find core school)
-            h_core = h_full.split(' ')[0].lower() 
-            a_core = a_full.split(' ')[0].lower()
-
             for p in projections:
-                bt_name = str(p[1]).lower()
-                if h_core in bt_name or bt_name in h_full.lower():
-                    # Scan row for the Barthag decimal (usually index 8 for 2026)
-                    h_rank = next((float(x) for x in p if isinstance(x, (int, float)) and 0.1 < float(x) < 0.99), 0.5)
-                if a_core in bt_name or bt_name in a_full.lower():
-                    a_rank = next((float(x) for x in p if isinstance(x, (int, float)) and 0.1 < float(x) < 0.99), 0.5)
+                bt_name = str(p[1]).lower() # Index 1 = Team Name
+                if h_full.lower() in bt_name or bt_name in h_full.lower():
+                    h_rank = float(p[7]) # Index 7 = Barthag for 2026
+                if a_full.lower() in bt_name or bt_name in a_full.lower():
+                    a_rank = float(p[7])
 
-            # Log5 Win Probability
+            # Log5 Win Prob Math
             denom = (h_rank + a_rank - (2 * h_rank * a_rank))
             win_prob = (h_rank - (h_rank * a_rank)) / denom if denom != 0 else 0.5
             edge = (win_prob - mkt_prob) * 100
@@ -64,14 +58,11 @@ def run_streamlit_ui():
                 "Edge %": f"{edge:.1f}%"
             })
 
-        if rows:
-            st.dataframe(pd.DataFrame(rows), use_container_width=True)
-            st.success(f"Successfully matched {len(rows)} games!")
-        else:
-            st.info("No games found. The API might be empty for tonight.")
+        st.dataframe(pd.DataFrame(rows), use_container_width=True)
+        st.success("Targeting 2026 rankings successful.")
 
     except Exception as e:
-        st.error(f"Critical Error: {e}")
+        st.error(f"Error: {e}")
 
 if __name__ == "__main__":
     run_streamlit_ui()
