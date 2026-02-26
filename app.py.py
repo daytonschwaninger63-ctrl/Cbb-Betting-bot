@@ -39,9 +39,28 @@ def run_headless_scan():
     print("Headless scan complete.")
 
 def run_streamlit_ui():
-    """Runs as a web dashboard."""
+    st.set_page_config(page_title="CBB Value Finder", layout="wide")
     st.title("🏀 CBB Value Finder")
-    # ... (Insert the Dashboard UI code provided in previous steps here)
+    
+    # Settings in the sidebar
+    bankroll = st.sidebar.number_input("Total Bankroll ($)", value=1000)
+    
+    try:
+        api_key = st.secrets["THE_ODDS_API_KEY"]
+        with st.spinner("Fetching latest market odds..."):
+            projections, odds = get_data(api_key)
+        
+        if odds:
+            st.success("Odds updated!")
+            # This creates the actual table you see on screen
+            st.dataframe(odds, use_container_width=True)
+        else:
+            st.warning("No live odds found yet. Check back closer to tip-off.")
+
+    except Exception as e:
+        st.error(f"Configuration Error: {e}")
+        st.info("Make sure your API key is in Streamlit Advanced Settings > Secrets.")
+
 
 if __name__ == "__main__":
     if "--mode" in sys.argv:
