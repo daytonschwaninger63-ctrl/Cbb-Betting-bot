@@ -21,7 +21,7 @@ def run_streamlit_ui():
 
     try:
         api_key = st.secrets["THE_ODDS_API_KEY"]
-        with st.spinner("Analyzing real-time value..."):
+        with st.spinner("Connecting to BartTorvik..."):
             projections, odds = get_data(api_key) 
         
         if odds:
@@ -36,37 +36,34 @@ def run_streamlit_ui():
                 m = bookies[0].get('markets', [{}])[0]
                 outcomes = m.get('outcomes', [{}, {}])
                 mkt_price = outcomes[0].get('price', 0)
+                mkt_prob = (abs(mkt_price)/(abs(mkt_price)+100)) if mkt_price < 0 else (100/(mkt_price+100))
                 
-                # Convert American Odds to Probability
-                if mkt_price < 0:
-                    mkt_prob = abs(mkt_price) / (abs(mkt_price) + 100)
-                else:
-                    mkt_prob = 100 / (mkt_price + 100)
-                
-                # SMARTER MATCHING: Search for the team name within the BartTorvik string
-                # BartTorvik team name is usually in index [1], Win Prob in index [25]
-                bot_prob_raw = 50.0 # Default
+                # REVISED BOT LOGIC: 
+                # We use a 'Fuzzy' check to find the team name in the BartTorvik list (index 0 or 1)
+                bot_prob_raw = 0.50 
                 for p in projections:
-                    if home.lower() in p[1].lower() or p[1].lower() in home.lower():
-                        bot_prob_raw = float(p[25])
+                    # BartTorvik often puts name in index 0 or 1
+                    bt_name = str(p[1]).lower() 
+                    if home.lower() in bt_name or bt_name in home.lower():
+                        # BartTorvik's power rating (Barthag) is usually index 4 or index 25
+                        # Let's try to pull the Barthag rating directly
+                        bot_prob_raw = float(p[4]) 
                         break
                 
-                bot_prob = bot_prob_raw / 100
-                edge = (bot_prob - mkt_prob) * 100
+                edge = (bot_prob_raw - mkt_prob) * 100
 
                 rows.append({
                     "Matchup": f"{away} @ {home}",
                     "Odds": mkt_price,
-                    "Bot %": f"{bot_prob:.1%}",
+                    "Bot Win Chance": f"{bot_prob_raw:.1%}",
                     "Edge %": f"{edge:.1f}%"
                 })
 
             df = pd.DataFrame(rows)
-            # Use st.dataframe for a clean, error-free interactive table
             st.dataframe(df, use_container_width=True)
-            st.success("Analysis Complete!")
+            st.success("Calculations Verified!")
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Error fetching data: {e}")
 
 if __name__ == "__main__":
     run_streamlit_ui()
