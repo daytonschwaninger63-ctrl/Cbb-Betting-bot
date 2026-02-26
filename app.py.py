@@ -39,13 +39,20 @@ def run_headless_scan():
     print("Headless scan complete.")
 
 def run_streamlit_ui():
-             st.set_page_config(page_title="CBB Value Finder", layout="wide")
+                 st.set_page_config(page_title="CBB Value Finder", layout="wide")
     st.title("🏀 CBB Value Finder")
-    
+
+    def american_to_prob(odds):
+        """Converts American odds (e.g. -110, +120) to implied probability."""
+        if odds > 0:
+            return 100 / (odds + 100)
+        return abs(odds) / (abs(odds) + 100)
+
     try:
         api_key = st.secrets["THE_ODDS_API_KEY"]
-        with st.spinner("Calculating edges..."):
-            projections, odds = get_data(api_key)
+        with st.spinner("Analyzing BartTorvik Projections vs Market Odds..."):
+            # projections = your bot's data; odds = live sportsbook data
+            projections, odds = get_data(api_key) 
         
         if odds:
             rows = []
@@ -53,29 +60,40 @@ def run_streamlit_ui():
                 home = game.get('home_team')
                 away = game.get('away_team')
                 
-                # Pulling the market price
+                # 1. Get the Market Odds (using the first bookmaker)
                 bookies = game.get('bookmakers', [])
-                market_price = "N/A"
-                if bookies:
-                    m = bookies[0].get('markets', [{}])[0]
-                    outcomes = m.get('outcomes', [{}, {}])
-                    market_price = f"{outcomes[0].get('price', '')}"
+                if not bookies: continue
+                
+                market_data = bookies[0].get('markets', [{}])[0]
+                outcomes = market_data.get('outcomes', [])
+                if len(outcomes) < 2: continue
 
-                # Calculate a 'dummy' edge for the table display
-                # (Later we will connect this to your BartTorvik math)
-                edge_val = 5.4 
+                # 2. Extract price and calculate market probability
+                mkt_price = outcomes[0].get('price')
+                mkt_prob = american_to_prob(mkt_price)
+
+                # 3. Find this game in your BartTorvik projections
+                # (Assuming projections is a dict or list from get_data)
+                your_prob = 0.55 # Placeholder: This will link to your projection logic
+                
+                # 4. Calculate Edge
+                edge = (your_prob - mkt_prob) * 100
 
                 rows.append({
-                    "Teams": f"{away} @ {home}",
-                    "Odds": market_price,
-                    "Edge %": f"{edge_val}%"
+                    "Matchup": f"{away} @ {home}",
+                    "Market Odds": mkt_price,
+                    "Market %": f"{mkt_prob:.1%}",
+                    "Bot %": f"{your_prob:.1%}",
+                    "Edge": f"{edge:.1f}%"
                 })
 
-            st.dataframe(pd.DataFrame(rows), use_container_width=True)
-            st.success("Analysis Complete!")
-    except Exception as e:
-        st.error(f"Error: {e}")
+            # Create and style the table
+            df = pd.DataFrame(rows)
+            st.dataframe(df.style.background_gradient(subset=['Edge'], cmap='Greens'), use_container_width=True)
+            st.success(f"Found {len(df)} live value opportunities!")
 
+    except Exception as e:
+        st.error(f"Error updating dashboard: {e}")
 
 if __name__ == "__main__":
     if "--mode" in sys.argv:
