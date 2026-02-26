@@ -2,16 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 
-# This helps the bot find teams even if the names are slightly different
-TEAM_MAP = {
-    "Saint Mary's Gaels": "St. Mary's",
-    "Ole Miss Rebels": "Mississippi",
-    "UConn Huskies": "Connecticut",
-    "NC State Wolfpack": "N.C. State",
-    "Miami (FL) Hurricanes": "Miami FL",
-    "Saint Joseph's Hawks": "St. Joseph's"
-}
-
 def get_data(api_key):
     # 1. Fetch live market odds
     odds_url = f"https://api.the-odds-api.com/v4/sports/basketball_ncaab/odds/?apiKey={api_key}&regions=us&markets=spreads"
@@ -46,14 +36,22 @@ def run_streamlit_ui():
                 m = bookies[0].get('markets', [{}])[0]
                 outcomes = m.get('outcomes', [{}, {}])
                 mkt_price = outcomes[0].get('price', 0)
-                mkt_prob = (abs(mkt_price)/(abs(mkt_price)+100)) if mkt_price < 0 else (100/(mkt_price+100))
                 
-                # Real Bot Probability Logic
-                mapped_name = TEAM_MAP.get(home, home)
-                # This searches the BartTorvik data (column 1 is team name, column 25 is win prob)
-                bot_prob_raw = next((p[25] for p in projections if mapped_name.lower() in p[1].lower()), 50.0)
-                bot_prob = float(bot_prob_raw) / 100
+                # Convert American Odds to Probability
+                if mkt_price < 0:
+                    mkt_prob = abs(mkt_price) / (abs(mkt_price) + 100)
+                else:
+                    mkt_prob = 100 / (mkt_price + 100)
                 
+                # SMARTER MATCHING: Search for the team name within the BartTorvik string
+                # BartTorvik team name is usually in index [1], Win Prob in index [25]
+                bot_prob_raw = 50.0 # Default
+                for p in projections:
+                    if home.lower() in p[1].lower() or p[1].lower() in home.lower():
+                        bot_prob_raw = float(p[25])
+                        break
+                
+                bot_prob = bot_prob_raw / 100
                 edge = (bot_prob - mkt_prob) * 100
 
                 rows.append({
@@ -64,7 +62,7 @@ def run_streamlit_ui():
                 })
 
             df = pd.DataFrame(rows)
-            # Using st.dataframe for a clean, sortable table
+            # Use st.dataframe for a clean, error-free interactive table
             st.dataframe(df, use_container_width=True)
             st.success("Analysis Complete!")
     except Exception as e:
