@@ -39,7 +39,7 @@ def run_headless_scan():
     print("Headless scan complete.")
 
 def run_streamlit_ui():
-                         st.set_page_config(page_title="CBB Value Finder", layout="wide")
+ st.set_page_config(page_title="CBB Value Finder", layout="wide")
     st.title("🏀 CBB Value Finder")
 
     try:
