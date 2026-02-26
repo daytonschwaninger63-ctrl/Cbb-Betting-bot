@@ -52,3 +52,8 @@ if __name__ == "__main__":
         run_headless_scan()
     else:
         run_streamlit_ui()
+# This tells Streamlit to actually run your dashboard
+if __name__ == "__main__":
+    # Check if we are just doing an alert scan or showing the UI
+    if "--mode" not in sys.argv:
+        run_streamlit_ui() 
