@@ -2,18 +2,22 @@ import streamlit as st
 import pandas as pd
 import requests
 
-# Translation Dictionary
+# This helps the bot find teams even if the names are slightly different
 TEAM_MAP = {
-    "California Golden Bears": "California",
     "Saint Mary's Gaels": "St. Mary's",
-    "Oregon St Beavers": "Oregon St.",
-    "Wisconsin Badgers": "Wisconsin",
-    "Ole Miss Rebels": "Mississippi"
+    "Ole Miss Rebels": "Mississippi",
+    "UConn Huskies": "Connecticut",
+    "NC State Wolfpack": "N.C. State",
+    "Miami (FL) Hurricanes": "Miami FL",
+    "Saint Joseph's Hawks": "St. Joseph's"
 }
 
 def get_data(api_key):
+    # 1. Fetch live market odds
     odds_url = f"https://api.the-odds-api.com/v4/sports/basketball_ncaab/odds/?apiKey={api_key}&regions=us&markets=spreads"
     odds_resp = requests.get(odds_url).json()
+    
+    # 2. Fetch real BartTorvik projections
     proj_url = "https://barttorvik.com/2026_data.json" 
     try:
         proj_resp = requests.get(proj_url).json()
@@ -24,10 +28,10 @@ def get_data(api_key):
 def run_streamlit_ui():
     st.set_page_config(page_title="CBB Value Finder", layout="wide")
     st.title("🏀 CBB Value Finder")
-    
+
     try:
         api_key = st.secrets["THE_ODDS_API_KEY"]
-        with st.spinner("Fetching Live Data..."):
+        with st.spinner("Analyzing real-time value..."):
             projections, odds = get_data(api_key) 
         
         if odds:
@@ -38,15 +42,18 @@ def run_streamlit_ui():
                 bookies = game.get('bookmakers', [])
                 if not bookies: continue
                 
-                # Get Odds
+                # Market Probability Math
                 m = bookies[0].get('markets', [{}])[0]
                 outcomes = m.get('outcomes', [{}, {}])
                 mkt_price = outcomes[0].get('price', 0)
                 mkt_prob = (abs(mkt_price)/(abs(mkt_price)+100)) if mkt_price < 0 else (100/(mkt_price+100))
                 
-                # Match Team
+                # Real Bot Probability Logic
                 mapped_name = TEAM_MAP.get(home, home)
-                bot_prob = next((float(p[25])/100 for p in projections if mapped_name in p[1]), 0.50)
+                # This searches the BartTorvik data (column 1 is team name, column 25 is win prob)
+                bot_prob_raw = next((p[25] for p in projections if mapped_name.lower() in p[1].lower()), 50.0)
+                bot_prob = float(bot_prob_raw) / 100
+                
                 edge = (bot_prob - mkt_prob) * 100
 
                 rows.append({
@@ -57,10 +64,9 @@ def run_streamlit_ui():
                 })
 
             df = pd.DataFrame(rows)
-            # SIMPLE TABLE - No gradient, no errors
-            st.table(df) 
-            st.success("Data loaded successfully!")
-            
+            # Using st.dataframe for a clean, sortable table
+            st.dataframe(df, use_container_width=True)
+            st.success("Analysis Complete!")
     except Exception as e:
         st.error(f"Error: {e}")
 
