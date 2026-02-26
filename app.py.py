@@ -39,28 +39,59 @@ def run_headless_scan():
     print("Headless scan complete.")
 
 def run_streamlit_ui():
-    st.set_page_config(page_title="CBB Value Finder", layout="wide")
-    st.title("🏀 CBB Value Finder")
-    
-    # Settings in the sidebar
-    bankroll = st.sidebar.number_input("Total Bankroll ($)", value=1000)
-    
-    try:
-        api_key = st.secrets["THE_ODDS_API_KEY"]
-        with st.spinner("Fetching latest market odds..."):
-            projections, odds = get_data(api_key)
-        
-        if odds:
-            st.success("Odds updated!")
-            # This creates the actual table you see on screen
-            st.dataframe(odds, use_container_width=True)
-        else:
-            st.warning("No live odds found yet. Check back closer to tip-off.")
+         if odds:
+            st.success("Analysis Complete!")
+            
+            rows = []
+            for game in odds:
+                # 1. Get Team Names
+                home = game.get('home_team')
+                away = game.get('away_team')
+            
+                # 2. Get Market Odds (e.g., FanDuel/DraftKings)
+                bookies = game.get('bookmakers', [])
+                if not bookies: continue
+                
+                # We'll look at the first bookmaker for the 'spreads' market
+                market_line = "N/A"
+                implied_prob = 0.524  # Default for -110 odds
+                
+                markets = bookies[0].get('markets', [])
+                for m in markets:
+                    if m['key'] == 'spreads':
+                        outcome = m['outcomes'][0]
+                        market_line = f"{outcome['name']} {outcome['point']}"
+                        # Convert American Odds (like -110) to Implied %
+                        price = outcome['price']
+                        if price > 0:
+                            implied_prob = 100 / (price + 100)
+                        else:
+                            implied_prob = abs(price) / (abs(price) + 100)
 
-    except Exception as e:
-        st.error(f"Configuration Error: {e}")
-        st.info("Make sure your API key is in Streamlit Advanced Settings > Secrets.")
+                # 3. Get Your Bot's Projection (Dummy logic for now)
+                # In a real setup, this pulls from your 'projections' data
+                projected_win_prob = 0.58  # Let's assume bot thinks 58%
+                
+                # 4. Calculate the Edge
+                edge = (projected_win_prob - implied_prob) * 100
+                
+                rows.append({
+                    "Game": f"{away} @ {home}",
+                    "Market Line": market_line,
+                    "Our Win %": f"{projected_win_prob:.1%}",
+                    "Market %": f"{implied_prob:.1%}",
+                    "Edge": f"{edge:.1f}%"
+                })
 
+            # Create a styled dataframe
+            df = pd.DataFrame(rows)
+            
+            # Highlight high edge games in green
+            def color_edge(val):
+                color = 'green' if float(val.strip('%')) > 5 else 'white'
+                return f'color: {color}'
+
+            st.dataframe(df.style.applymap(color_edge, subset=['Edge']), use_container_width=True)
 
 if __name__ == "__main__":
     if "--mode" in sys.argv:
