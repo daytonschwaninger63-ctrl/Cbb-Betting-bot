@@ -39,14 +39,8 @@ def run_headless_scan():
     print("Headless scan complete.")
 
 def run_streamlit_ui():
-                     st.set_page_config(page_title="CBB Value Finder", layout="wide")
+                         st.set_page_config(page_title="CBB Value Finder", layout="wide")
     st.title("🏀 CBB Value Finder")
-
-    # Helper function to convert odds to probability
-    def american_to_prob(odds):
-        if odds > 0:
-            return 100 / (odds + 100)
-        return abs(odds) / (abs(odds) + 100)
 
     try:
         api_key = st.secrets["THE_ODDS_API_KEY"]
@@ -61,13 +55,12 @@ def run_streamlit_ui():
                 bookies = game.get('bookmakers', [])
                 if not bookies: continue
                 
-                # Extract odds and calculate probability
                 market_data = bookies[0].get('markets', [{}])[0]
                 outcomes = market_data.get('outcomes', [{}, {}])
                 mkt_price = outcomes[0].get('price', 0)
-                mkt_prob = american_to_prob(mkt_price)
                 
-                # Your bot's projection (currently a placeholder)
+                # Math for the Edge
+                mkt_prob = (abs(mkt_price) / (abs(mkt_price) + 100)) if mkt_price < 0 else (100 / (mkt_price + 100))
                 bot_prob = 0.58 
                 edge = (bot_prob - mkt_prob) * 100
 
@@ -78,14 +71,10 @@ def run_streamlit_ui():
                 })
 
             df = pd.DataFrame(rows)
-            # This line applies the green color scale to your edges
             st.dataframe(df.style.background_gradient(subset=['Edge %'], cmap='Greens'), use_container_width=True)
             st.success("Calculations complete!")
     except Exception as e:
         st.error(f"Error: {e}")
 
 if __name__ == "__main__":
-    if "--mode" in sys.argv:
-        run_headless_scan()
-    else:
-        run_streamlit_ui()
+    run_streamlit_ui()
