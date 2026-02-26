@@ -18,41 +18,40 @@ def run_streamlit_ui():
 
     try:
         api_key = st.secrets["THE_ODDS_API_KEY"]
-        with st.spinner("Crunching 2026 Power Rankings..."):
+        with st.spinner("Forcing Data Match..."):
             projections, odds = get_data(api_key) 
         
         if odds:
             rows = []
             for game in odds:
-                home_name = game.get('home_team')
-                away_name = game.get('away_team')
+                h_full = game.get('home_team')
+                a_full = game.get('away_team')
                 bookies = game.get('bookmakers', [])
                 if not bookies: continue
                 
-                # Get Market Odds
                 m = bookies[0].get('markets', [{}])[0]
                 outcomes = m.get('outcomes', [{}, {}])
                 mkt_price = outcomes[0].get('price', 0)
                 mkt_prob = (abs(mkt_price)/(abs(mkt_price)+100)) if mkt_price < 0 else (100/(mkt_price+100))
                 
-                # NEW 2026 INDEX LOGIC
-                # Index 1 = Team Name | Index 8 = Barthag Rating
-                home_rank = 0.5
-                away_rank = 0.5
-                
+                # --- BRUTE FORCE MATCHING ---
+                h_rank, a_rank = 0.5, 0.5
+                h_short = h_full[:5].lower() # Just use first 5 letters
+                a_short = a_full[:5].lower()
+
                 for p in projections:
                     bt_name = str(p[1]).lower()
-                    if home_name.lower() in bt_name or bt_name in home_name.lower():
-                        home_rank = float(p[8])
-                    if away_name.lower() in bt_name or bt_name in away_name.lower():
-                        away_rank = float(p[8])
+                    if h_short in bt_name:
+                        h_rank = float(p[8])
+                    if a_short in bt_name:
+                        a_rank = float(p[8])
 
-                # Log5 Formula
-                win_prob = (home_rank - home_rank * away_rank) / (home_rank + away_rank - 2 * home_rank * away_rank)
+                # Math
+                win_prob = (h_rank - h_rank * a_rank) / (h_rank + a_rank - 2 * h_rank * a_rank)
                 edge = (win_prob - mkt_prob) * 100
 
                 rows.append({
-                    "Matchup": f"{away_name} @ {home_name}",
+                    "Matchup": f"{a_full} @ {h_full}",
                     "Odds": mkt_price,
                     "Bot Win %": f"{win_prob:.1%}",
                     "Edge %": f"{edge:.1f}%"
@@ -60,7 +59,13 @@ def run_streamlit_ui():
 
             df = pd.DataFrame(rows)
             st.dataframe(df, use_container_width=True)
-            st.success("2026 Data Loaded!")
+            
+            # Debugging Help
+            if len(df) > 0 and "50.0%" in df['Bot Win %'].values[0]:
+                st.warning("Bot is still defaulting to 50%. This usually means the data columns shifted again.")
+            else:
+                st.success("Data Match Successful!")
+                
     except Exception as e:
         st.error(f"Error: {e}")
 
