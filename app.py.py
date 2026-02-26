@@ -39,59 +39,43 @@ def run_headless_scan():
     print("Headless scan complete.")
 
 def run_streamlit_ui():
-         if odds:
-            st.success("Analysis Complete!")
-            
+             st.set_page_config(page_title="CBB Value Finder", layout="wide")
+    st.title("🏀 CBB Value Finder")
+    
+    try:
+        api_key = st.secrets["THE_ODDS_API_KEY"]
+        with st.spinner("Calculating edges..."):
+            projections, odds = get_data(api_key)
+        
+        if odds:
             rows = []
             for game in odds:
-                # 1. Get Team Names
                 home = game.get('home_team')
                 away = game.get('away_team')
-            
-                # 2. Get Market Odds (e.g., FanDuel/DraftKings)
+                
+                # Pulling the market price
                 bookies = game.get('bookmakers', [])
-                if not bookies: continue
-                
-                # We'll look at the first bookmaker for the 'spreads' market
-                market_line = "N/A"
-                implied_prob = 0.524  # Default for -110 odds
-                
-                markets = bookies[0].get('markets', [])
-                for m in markets:
-                    if m['key'] == 'spreads':
-                        outcome = m['outcomes'][0]
-                        market_line = f"{outcome['name']} {outcome['point']}"
-                        # Convert American Odds (like -110) to Implied %
-                        price = outcome['price']
-                        if price > 0:
-                            implied_prob = 100 / (price + 100)
-                        else:
-                            implied_prob = abs(price) / (abs(price) + 100)
+                market_price = "N/A"
+                if bookies:
+                    m = bookies[0].get('markets', [{}])[0]
+                    outcomes = m.get('outcomes', [{}, {}])
+                    market_price = f"{outcomes[0].get('price', '')}"
 
-                # 3. Get Your Bot's Projection (Dummy logic for now)
-                # In a real setup, this pulls from your 'projections' data
-                projected_win_prob = 0.58  # Let's assume bot thinks 58%
-                
-                # 4. Calculate the Edge
-                edge = (projected_win_prob - implied_prob) * 100
-                
+                # Calculate a 'dummy' edge for the table display
+                # (Later we will connect this to your BartTorvik math)
+                edge_val = 5.4 
+
                 rows.append({
-                    "Game": f"{away} @ {home}",
-                    "Market Line": market_line,
-                    "Our Win %": f"{projected_win_prob:.1%}",
-                    "Market %": f"{implied_prob:.1%}",
-                    "Edge": f"{edge:.1f}%"
+                    "Teams": f"{away} @ {home}",
+                    "Odds": market_price,
+                    "Edge %": f"{edge_val}%"
                 })
 
-            # Create a styled dataframe
-            df = pd.DataFrame(rows)
-            
-            # Highlight high edge games in green
-            def color_edge(val):
-                color = 'green' if float(val.strip('%')) > 5 else 'white'
-                return f'color: {color}'
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+            st.success("Analysis Complete!")
+    except Exception as e:
+        st.error(f"Error: {e}")
 
-            st.dataframe(df.style.applymap(color_edge, subset=['Edge']), use_container_width=True)
 
 if __name__ == "__main__":
     if "--mode" in sys.argv:
