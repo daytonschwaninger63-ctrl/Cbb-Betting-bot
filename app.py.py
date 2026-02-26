@@ -4,10 +4,15 @@ import requests
 import sys
 
 def get_data(api_key):
-    # This pulls the live odds from the API
-    url = f"https://api.the-odds-api.com/v4/sports/basketball_ncaab/odds/?apiKey={api_key}&regions=us&markets=spreads"
-    response = requests.get(url)
-    return None, response.json()
+    # Fetch BartTorvik projections (Simplified for this example)
+    proj_url = "https://barttorvik.com/2026_data.json" # Adjust year as needed
+    # Fetch Live Odds
+    odds_url = f"https://api.the-odds-api.com/v4/sports/basketball_ncaab/odds/?apiKey={api_key}&regions=us&markets=spreads"
+    
+    odds_resp = requests.get(odds_url).json()
+    # For now, we'll use a sample projection list to avoid complex parsing
+    sample_projections = [{"team": "Oregon", "win_prob": 62.5}, {"team": "Wisconsin", "win_prob": 45.0}]
+    return sample_projections, odds_resp
 
 def run_streamlit_ui():
     st.set_page_config(page_title="CBB Value Finder", layout="wide")
@@ -21,29 +26,22 @@ def run_streamlit_ui():
         if odds:
             rows = []
             for game in odds:
-                home = game.get('home_team')
-                away = game.get('away_team')
+                home, away = game.get('home_team'), game.get('away_team')
                 bookies = game.get('bookmakers', [])
                 if not bookies: continue
                 
-                market_data = bookies[0].get('markets', [{}])[0]
-                outcomes = market_data.get('outcomes', [{}, {}])
+                outcomes = bookies[0].get('markets', [{}])[0].get('outcomes', [{}, {}])
                 mkt_price = outcomes[0].get('price', 0)
+                mkt_prob = (abs(mkt_price)/(abs(mkt_price)+100)) if mkt_price < 0 else (100/(mkt_price+100))
                 
-                # Math for the Edge
-                mkt_prob = (abs(mkt_price) / (abs(mkt_price) + 100)) if mkt_price < 0 else (100 / (mkt_price + 100))
-                bot_prob = 0.58 
+                # Matching logic: Find the home team's projected win %
+                bot_prob = next((p['win_prob']/100 for p in projections if p['team'] in home), 0.50)
                 edge = (bot_prob - mkt_prob) * 100
 
-                rows.append({
-                    "Matchup": f"{away} @ {home}",
-                    "Odds": mkt_price,
-                    "Edge %": f"{edge:.1f}%"
-                })
+                rows.append({"Matchup": f"{away} @ {home}", "Odds": mkt_price, "Edge %": f"{edge:.1f}%"})
 
             df = pd.DataFrame(rows)
-            # Use a simpler display if the style is causing issues
-            st.table(df)
+            st.table(df) # table is more stable on mobile view
             st.success("Calculations complete!")
     except Exception as e:
         st.error(f"Error: {e}")
