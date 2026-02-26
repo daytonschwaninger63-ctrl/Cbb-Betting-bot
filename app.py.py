@@ -44,16 +44,7 @@ def run_streamlit_ui():
     # ... (Insert the Dashboard UI code provided in previous steps here)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", help="Run mode: 'alert' or 'ui'", default="ui")
-    args = parser.parse_args()
-
-    if args.mode == "alert":
+    if "--mode" in sys.argv:
         run_headless_scan()
     else:
         run_streamlit_ui()
-# This tells Streamlit to actually run your dashboard
-if __name__ == "__main__":
-    # Check if we are just doing an alert scan or showing the UI
-    if "--mode" not in sys.argv:
-        run_streamlit_ui() 
