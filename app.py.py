@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import requests
 import sys
+
+# Line 5: The Team Name Mapper
 TEAM_MAP = {
     "California Golden Bears": "California",
     "Saint Mary's Gaels": "St. Mary's",
@@ -19,15 +21,18 @@ TEAM_MAP = {
     "Florida Intl Golden Panthers": "FIU",
     "UL Monroe Warhawks": "ULM"
 }
+
 def get_data(api_key):
-    # Fetch BartTorvik projections (Simplified for this example)
-    proj_url = "https://barttorvik.com/2026_data.json" # Adjust year as needed
     # Fetch Live Odds
     odds_url = f"https://api.the-odds-api.com/v4/sports/basketball_ncaab/odds/?apiKey={api_key}&regions=us&markets=spreads"
-    
     odds_resp = requests.get(odds_url).json()
-    # For now, we'll use a sample projection list to avoid complex parsing
-    sample_projections = [{"team": "Oregon", "win_prob": 62.5}, {"team": "Wisconsin", "win_prob": 45.0}]
+    
+    # Placeholder for BartTorvik Data (to be expanded in next phase)
+    sample_projections = [
+        {"team": "Oregon", "win_prob": 62.5}, 
+        {"team": "Wisconsin", "win_prob": 45.0},
+        {"team": "St. Mary's", "win_prob": 58.0}
+    ]
     return sample_projections, odds_resp
 
 def run_streamlit_ui():
@@ -46,19 +51,26 @@ def run_streamlit_ui():
                 bookies = game.get('bookmakers', [])
                 if not bookies: continue
                 
+                # Market Probability Math
                 outcomes = bookies[0].get('markets', [{}])[0].get('outcomes', [{}, {}])
                 mkt_price = outcomes[0].get('price', 0)
                 mkt_prob = (abs(mkt_price)/(abs(mkt_price)+100)) if mkt_price < 0 else (100/(mkt_price+100))
                 
-                # Matching logic: Find the home team's projected win %
-                bot_prob = next((p['win_prob']/100 for p in projections if p['team'] in home), 0.50)
+                # Step 2 Logic: Match names and calculate real Edge
+                mapped_name = TEAM_MAP.get(home, home)
+                bot_prob = next((p['win_prob']/100 for p in projections if p['team'] in mapped_name), 0.50)
                 edge = (bot_prob - mkt_prob) * 100
 
-                rows.append({"Matchup": f"{away} @ {home}", "Odds": mkt_price, "Edge %": f"{edge:.1f}%"})
+                rows.append({
+                    "Matchup": f"{away} @ {home}", 
+                    "Odds": mkt_price, 
+                    "Edge %": f"{edge:.1f}%"
+                })
 
             df = pd.DataFrame(rows)
-            st.table(df) # table is more stable on mobile view
-            st.success("Calculations complete!")
+            # Styling the dataframe with a green gradient for positive edges
+            st.dataframe(df.style.background_gradient(subset=['Edge %'], cmap='Greens'), use_container_width=True)
+            st.success("Analysis Complete!")
     except Exception as e:
         st.error(f"Error: {e}")
 
